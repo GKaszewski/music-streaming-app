@@ -1,4 +1,4 @@
-# Music streaming app
+# Music streaming app [WIP]
 
 An app which streams music from my platform.
 
