@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:music_streaming_app/playerPage.dart';
 import 'appData.dart' as AppData;

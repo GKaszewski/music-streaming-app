@@ -5,6 +5,7 @@ import 'package:audioplayer/audioplayer.dart';
 import 'appData.dart' as AppData;
 import 'bottomControls.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
 import 'song.dart';
 
@@ -28,10 +29,8 @@ class PlayerPageState extends State<PlayerPage> {
   PlayerState _playerState = PlayerState.STOPPED;
   Duration position;
   Duration duration;
-  StreamSubscription _positionSub;
   StreamSubscription _audioPlayerStateSub;
   String displayName = "";
-  Queue<Song> tempQueue = new Queue();
 
   Icon buttonIcon = new Icon(
     Icons.play_arrow,
@@ -60,10 +59,11 @@ class PlayerPageState extends State<PlayerPage> {
 
   void initAudioPlayer() {
     audioPlayer = new AudioPlayer();
-    _positionSub = audioPlayer.onAudioPositionChanged
-        .listen((p) => setState(() => position = p));
     _audioPlayerStateSub = audioPlayer.onPlayerStateChanged.listen((s) {
+      print(_playerState);
       if (s == AudioPlayerState.PLAYING) {
+        _playerState =PlayerState.PLAYING;
+        buttonIcon = Icon(Icons.pause, color: Colors.red,);
         setState(() {
           duration = audioPlayer.duration;
         });
@@ -74,7 +74,7 @@ class PlayerPageState extends State<PlayerPage> {
         });
       } else if (s == AudioPlayerState.PAUSED) {
         _playerState = PlayerState.PAUSED;
-        buttonIcon = Icon(Icons.pause);
+        buttonIcon = Icon(Icons.play_arrow, color: Colors.red);
         duration = duration;
         position = position;
       }
@@ -89,8 +89,9 @@ class PlayerPageState extends State<PlayerPage> {
 
   void onComplete() {
     setState(() {
-      //AppData.userQueue.removeFirst();
-      buttonIcon = Icon(Icons.play_arrow);
+      if(AppData.userQueue.isNotEmpty)
+        AppData.userQueue.removeFirst();
+      buttonIcon = Icon(Icons.play_arrow, color: Colors.red,);
       audioPlayer.stop();
       currentSong = new Song(
           albumUrl: "",
@@ -110,24 +111,19 @@ class PlayerPageState extends State<PlayerPage> {
   @override
   void initState() {
     super.initState();
-    tempQueue.add(currentSong);
     initAudioPlayer();
     getCurrentUser();
     checkQueue();
   }
 
   void checkQueue() {
-
     if (AppData.userQueue.isNotEmpty) {
       Song tempSong = AppData.userQueue.removeFirst();
-      if (tempSong != null) {
-        if (currentSong.songName == "") {
-          setState(() {
+      setState(() {
             currentSong = tempSong;
-          });
-        }
-      }
+      });
     }
+    print("Queue's elements: ${AppData.userQueue.length}");
   }
 
   Future<void> getCurrentUser() async {
@@ -136,7 +132,6 @@ class PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> play(String url) async {
-    await audioPlayer.stop();
     await audioPlayer.play(url);
     setState(() {
       _playerState = PlayerState.PLAYING;
@@ -169,26 +164,20 @@ class PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> skipForward() async {
-    await audioPlayer.stop();
-    setState(() {
-      _playerState = PlayerState.STOPPED;
-      position = new Duration();
-    });
-    checkQueue();
-    await audioPlayer.play(currentSong.audioUrl);
-    setState(() {
-      _playerState = PlayerState.PLAYING;
-      buttonIcon = new Icon(
-        Icons.pause,
-        color: Colors.red,
-        size: 30,
-      );
-    });
+      await audioPlayer.stop();
+      setState(() {
+        checkQueue();
+       _playerState = PlayerState.PAUSED;
+       buttonIcon =Icon(Icons.play_arrow, color: Colors.red, size: 30,);
+      });
   }
 
   Future<void> signOut() async {
     FirebaseAuth _auth = FirebaseAuth.instance;
+    GoogleSignIn _googleAuth = new GoogleSignIn();
+    await _googleAuth.signOut();
     await _auth.signOut();
+    AppData.user = null;
   }
 
   void goToHome() {
@@ -270,10 +259,9 @@ class PlayerPageState extends State<PlayerPage> {
       splashColor: Colors.white12,
       highlightColor: Colors.white12.withOpacity(0.5),
       onPressed: () {
-        play(currentSong.audioUrl);
         if (_playerState == PlayerState.PLAYING) {
           pause();
-        } else if (_playerState == PlayerState.PAUSED) {
+        } else if (_playerState == PlayerState.PAUSED || _playerState ==PlayerState.STOPPED) {
           play(currentSong.audioUrl);
         }
       },

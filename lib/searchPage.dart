@@ -8,31 +8,56 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flushbar/flushbar.dart';
 
-class SearchPage extends StatefulWidget{
-
+class SearchPage extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
     return new SearchPageState();
   }
-
 }
 
-class SearchPageState extends State<SearchPage>{
-  Song _song = new Song(albumUrl: "", audioUrl: "", songAuthor: "", songName: "", albumName: "", tags: null);
-  
-  Future<void> loadPlayerPage(FirebaseUser user, Song song) async{
-    Navigator.of(context).pop();
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (BuildContext context) => new PlayerPage(user: user)));
+class SearchPageState extends State<SearchPage> {
+  Song _song = new Song(
+      albumUrl: "",
+      audioUrl: "",
+      songAuthor: "",
+      songName: "",
+      albumName: "",
+      tags: null);
+  List<Song> searchedSongs = new List<Song>();
+
+  @override
+  void initState() {
+    // searchedSongs.add(_song);
   }
 
-  final TextEditingController textEditingController = new TextEditingController();
+  Future<void> loadPlayerPage(FirebaseUser user, Song song) async {
+    Navigator.of(context).pop();
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (BuildContext context) => new PlayerPage(user: user)));
+  }
 
-  Future<Song> getSong(String name) async{
-    String apiUrl = "https://streaming-platform-service.herokuapp.com/song/${name}";
+  final TextEditingController textEditingController =
+      new TextEditingController();
+
+  Future<List<Song>> getSongs(String query) async {
+    List<Song> songs = new List<Song>();
+    String apiUrl =
+        "https://streaming-platform-service.herokuapp.com/song/search/${query}";
     var response = await http.get(apiUrl);
-    if(response.statusCode == 200){
-      print(Song.fromJson(json.decode(response.body)).songName);
-      return Song.fromJson(json.decode(response.body));
+    if (response.statusCode == 200) {
+      List data;
+      var s = json.decode(response.body);
+      data = s;
+      data.forEach((element) {
+        var song = Song.fromJson(element);
+        songs.add(song);
+        print(song.songName);
+      });
+
+      print(songs.length);
+      return songs;
     }
 
     return null;
@@ -42,16 +67,19 @@ class SearchPageState extends State<SearchPage>{
   Widget build(BuildContext context) {
     return new Scaffold(
       appBar: new AppBar(
-        title: new Text("Search", style: TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+        title: new Text(
+          "Search",
+          style: TextStyle(color: Colors.red),
+          textAlign: TextAlign.center,
+        ),
         elevation: 0.0,
         backgroundColor: Colors.transparent,
         leading: new IconButton(
-          icon: Icon(Icons.arrow_back),
-          color: Colors.red,
-          onPressed: (){
-            loadPlayerPage(AppData.user, _song);
-          }
-        ),
+            icon: Icon(Icons.arrow_back),
+            color: Colors.red,
+            onPressed: () {
+              loadPlayerPage(AppData.user, _song);
+            }),
       ),
       body: Center(
         child: Column(
@@ -70,8 +98,21 @@ class SearchPageState extends State<SearchPage>{
                 },
               ),
             ),
-            new Expanded(child: new Container(),),
-            
+            Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: new ListView.builder(
+                    itemBuilder: (ctxt, i){
+                      var song =searchedSongs[i];
+                      return ListTile(
+                        title: SongWidget(song),
+                      );
+                    },
+                    itemCount: searchedSongs.length,
+              ),
+                ),
+            ),
+
             new BottomPanel(),
           ],
         ),
@@ -79,29 +120,67 @@ class SearchPageState extends State<SearchPage>{
     );
   }
 
-  Future<void> searchSong(String str, BuildContext context) async{
-    _song = await getSong(str.toLowerCase());
-    if(_song.songName != null){
-      AppData.userQueue.add(_song);
+  Future<void> searchSong(String str, BuildContext context) async {
+    var songs = await getSongs(str);
+    setState(() {
+      songs.forEach((song){
+        searchedSongs.add(song);
+      });
+    });
+    textEditingController.text = "";
+  }
+}
+
+class SongWidget extends StatelessWidget {
+  final Song _song;
+
+  SongWidget(Song song) : _song = song {}
+
+  Future<void> addSongToQuery(Song song, BuildContext context) async {
+    if (song != null || song.songName != "") {
+      AppData.userQueue.add(song);
       var notification = new Flushbar(
-        message: "Added ${_song.songAuthor} - ${_song.songName} to queue.",
+        message: "Added ${song.songAuthor} - ${song.songName} to queue.",
         duration: Duration(seconds: 2),
         flushbarPosition: FlushbarPosition.BOTTOM,
-        backgroundColor: Colors.red,
+        backgroundColor: Colors.red.withOpacity(0.6),
+      );
+      notification.show(context);
+    } else {
+      var notification = new Flushbar(
+        message:
+            "Couldn't find ${song.songAuthor} - ${song.songName} in database!",
+        duration: Duration(seconds: 2),
+        flushbarPosition: FlushbarPosition.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.6),
       );
       notification.show(context);
     }
-    else if(_song.songName == null){
-      _song = new Song(albumUrl: "", audioUrl: "", songAuthor: "", songName: "", albumName: "", tags: null);
-      var errorNotifictionBar = new Flushbar(
-        message: "Couldn't find: ${str}!",
-        duration: Duration(seconds: 4),
-        flushbarPosition: FlushbarPosition.BOTTOM,
-        backgroundColor: Colors.red,
-      );
-      errorNotifictionBar.show(context);
-    }
-    textEditingController.text = "";
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.black45.withOpacity(0.1),
+      child: Row(
+        children: <Widget>[
+          new RawMaterialButton(
+            shape: CircleBorder(),
+            fillColor: Colors.white,
+            splashColor: Colors.white12,
+            highlightColor: Colors.white12.withOpacity(.5),
+            onPressed: () {
+              addSongToQuery(_song, context);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(2.0),
+              child: Icon(Icons.add, color: Colors.red),
+            ),
+          ),
+          Text(_song.songName + "\n ${_song.songAuthor}", style: TextStyle(color: Colors.red),),
+        ],
+      ),
+    );
+  }
 }

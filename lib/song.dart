@@ -1,7 +1,4 @@
 import 'package:meta/meta.dart';
-import 'package:html/parser.dart';
-import 'dart:convert';
-import 'dart:collection';
 
 class Song{
   final String audioUrl;
@@ -28,5 +25,10 @@ factory Song.fromJson(dynamic json){
     songAuthor: json['author'],
     albumName: json['albumName'],
   );
+}
+
+List<Song> songsFromJSON(dynamic json){
+  List<Song> songs = json;
+  print(songs.length);
 }
 }
